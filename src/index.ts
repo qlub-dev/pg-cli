@@ -1,5 +1,5 @@
 
-
+import { ObjectLiteralExpression, Project, PropertyAssignment, ScriptTarget } from "ts-morph";
 import figlet from 'figlet'
 import { Command } from 'commander';
 import ora from 'ora';
@@ -46,106 +46,74 @@ if (!isCorrectDirectory()) {
     process.exit(1);
 }
 
+
+const project = new Project({
+    tsConfigFilePath: "./tsconfig.json",
+})
+
+
+
+
+
+
+
+
+
+
+
+
 if (options.add) {
     if (!options.name) {
         program.error('Please specify a name for the new Payment Gateway');
     }
-    const spinner = ora('Adding new Payment Gateway').start();
+    const spinner = ora('Adding new Payment Gateway\n').start();
     setTimeout(() => {
         spinner.succeed('Payment Gateway added successfully');
     }, 3000);
-    addEnumMember(options.name);
+    addEnumMember();
 }
 
+function addEnumMember(){
+    const sourceFile = project.addSourceFileAtPathIfExists("./src/repositories/payment/type.ts");
 
+    const enumDeclaration = sourceFile.getEnum("PaymentTypeEnum");
+    
+    const enumMembers = enumDeclaration.getMembers();
 
-function addEnumMember(name: string) {
-    const dir = process.cwd();
-    const filePath = `${dir}/src/repositories/payment/type.ts`;
+    const isEnumExist = enumMembers.some((member) => {
+        return member.getName() === capitalizeFirstLetter(options.name);
+    })
 
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-
-    // creates a mock source file
-    const sourceFile = ts.createSourceFile(
-        'enums.ts',
-        fileContent,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-    );
-
-    // find the enum you want to update by name
-    let existingEnum: ts.EnumDeclaration;
-    let existingPaymentTypeName: ts.VariableStatement;
-    ts.forEachChild(sourceFile, (node) => {
-        if (ts.isEnumDeclaration(node) && node.name.getText() === 'PaymentTypeEnum') {
-            existingEnum = node;
-        }
-        if (ts.isVariableStatement(node) && node.declarationList.declarations[0].name.getText() === 'PaymentTypeName') {
-            existingPaymentTypeName = node;
-        }
-
-    });
-
-    const oldText = sourceFile.text;
-
-    // create a new enum member
-    const newEnumMember = ts.factory.createEnumMember(
-        ts.factory.createIdentifier(capitalizeFirstLetter(name)),
-        ts.factory.createNumericLiteral(existingEnum.members.length),
-    );
-
-    const printer = ts.createPrinter();
-    // update the existing enum with the new member
-    const newEnumDeclaration = ts.factory.updateEnumDeclaration(
-        existingEnum,
-        undefined,
-        existingEnum.name,
-        ts.factory.createNodeArray([...existingEnum.members, newEnumMember])
-    );
-
-    const isEnumAlreadyExist = existingEnum.members.some((member) => {
-        return member.name.getText() === capitalizeFirstLetter(name);
-    });
-
-    if (isEnumAlreadyExist) {
+    
+    if (isEnumExist) {
         program.error('This Payment Gateway already exists');
     }
 
-
-
-    const newEnumDeclarationText = printer.printNode(ts.EmitHint.Unspecified, newEnumDeclaration, sourceFile);
-    const start = existingEnum.getStart(sourceFile);
-    const length = existingEnum.end - start;
-    // this took 2 hours to figure out
-    const textChangeRange = ts.createTextChangeRange(
-        ts.createTextSpan(start, length),
-        newEnumDeclarationText.length
-    );
-    let newText =
-        oldText.slice(0, start) +
-        newEnumDeclarationText +
-        oldText.slice(start + length);
-
-    const newFileContent = printer.printFile(
-        ts.updateSourceFile(
-            sourceFile,
-            newText,
-            textChangeRange,
-        ),
-    );
-
-
-    // format the file with the project prettier config
-    prettier.resolveConfig(`${dir}/.prettierrc`, { editorconfig: true, useCache: true }).then((options) => {
-        const formatted = prettier.format(newFileContent, {
-            ...options,
-            parser: 'typescript',
-        });
-        fs.writeFileSync(filePath, formatted);
-    }).catch((error) => {
-        program.error(error);
+    const enumLength = enumMembers.length;
+    
+    enumDeclaration.addMember({
+        name: capitalizeFirstLetter(options.name),
+        value: enumLength,
     });
+    
+    const paymentTypeName = sourceFile.getVariableDeclaration("PaymentTypeName");
+    const objectExpression = paymentTypeName.getInitializer() as ObjectLiteralExpression;
+
+    const isPaymentNameExist = objectExpression.getProperties().some((property: PropertyAssignment) => {
+        const isValueExist = property.getInitializer().getText().toLowerCase() === (options.name).toLowerCase()
+        const isNameExist = property.getName() === `[PaymentTypeEnum.${capitalizeFirstLetter(options.name)}]`;
+        return isValueExist || isNameExist;
+    })
+
+    if (isPaymentNameExist) {
+        program.error('This Payment Gateway already exists');
+    }
+    
+    objectExpression.addPropertyAssignment({
+        name:  `[PaymentTypeEnum.${capitalizeFirstLetter(options.name)}]`,
+        initializer: `'${capitalizeFirstLetter(options.name)}'`,
+    })
+    sourceFile.saveSync();
+
+    sourceFile.forget();
 }
-
-

@@ -16,7 +16,7 @@ enum PaymentTypeEnum {
     IndiaGooglePayDirect = 14,
     Vostro = 15,
     Tapp = 16,
-    Mypaymentgateway = 17,
+    Mypaymentgateway = 17
 }
 const PaymentTypeName: {
     [key: number]: string;
@@ -38,4 +38,5 @@ const PaymentTypeName: {
     [PaymentTypeEnum.IndiaGooglePayDirect]: 'IndiaGooglePayDirect',
     [PaymentTypeEnum.Vostro]: 'Vostro',
     [PaymentTypeEnum.Tapp]: 'Tapp',
-};
+    [PaymentTypeEnum.Mypaymentgateway]: 'Mypaymentgateway'
+}
